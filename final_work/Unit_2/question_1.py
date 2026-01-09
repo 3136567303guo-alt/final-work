@@ -1,139 +1,139 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.integrate import quad
-plt.rcParams['font.sans-serif'] = ['SimHei']  # 中文显示
-plt.rcParams['axes.unicode_minus'] = False    # 负号显示
+from scipy.fft import fft, fftfreq
 
-# ===================== 任务1：方波的傅里叶展开 =====================
-def square_wave(x):
-    """定义周期2π的方波函数"""
-    x = x % (2 * np.pi)  # 周期化
-    return 1 if 0 < x < np.pi else -1
+# 设置绘图风格，支持中文显示
+plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
+plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
 
-def square_fourier_coeff(n):
-    """计算方波傅里叶系数 b_n (a_n=0)"""
-    if n % 2 == 0:
-        return 0.0
-    else:
-        return 4 / (np.pi * n)
+def calculate_square_fourier(x, N_terms):
+    """
+    计算方波的傅里叶级数近似
+    f(x) = 4/pi * sum(sin(nx)/n) for n=1, 3, 5...
+    """
+    result = np.zeros_like(x)
+    # 只取奇数项: 1, 3, 5 ...
+    # 比如 N=3 时，k取 1, 3
+    for n in range(1, 2 * N_terms + 2, 2):
+        if n > N_terms: break
+        bn = 4 / (n * np.pi)
+        result += bn * np.sin(n * x)
+    return result
 
-def square_fourier_series(x, N):
-    """方波前N项傅里叶级数展开"""
-    series = 0.0
-    for n in range(1, N+1):
-        bn = square_fourier_coeff(n)
-        series += bn * np.sin(n * x)
-    return series
+def calculate_triangle_fourier(x, N_terms):
+    """
+    计算三角波的傅里叶级数近似
+    g(x) = pi/2 - 4/pi * sum(cos(nx)/n^2) for n=1, 3, 5...
+    注意：这是基于区间[-pi, pi]的推导结果修正。
+    根据前文推导: a0/2 = pi/2. an = -4/(n^2*pi) for odd n.
+    """
+    result = np.full_like(x, np.pi / 2) # a0/2 项
+    for n in range(1, 2 * N_terms + 2, 2):
+        if n > N_terms: break
+        an = -4 / ((n**2) * np.pi)
+        result += an * np.cos(n * x)
+    return result
 
-# 1.1 验证傅里叶系数（打印前10项）
-print("=== 方波傅里叶系数验证 ===")
-for n in range(1, 11):
-    an = 0.0  # 理论值a_n=0
-    bn = square_fourier_coeff(n)
-    print(f"n={n}: a_n={an:.4f}, b_n={bn:.4f}")
+# ==========================================
+# 任务 1: 方波分析
+# ==========================================
+x_square = np.linspace(0, 2 * np.pi, 1000)
+# 原始方波定义
+y_square_true = np.where(x_square < np.pi, 1, -1)
 
-# 1.2 绘制原函数与不同N项傅里叶级数对比
-x = np.linspace(-np.pi, 3*np.pi, 2000)  # 扩展区间观察周期性
-y_original = np.array([square_wave(xi) for xi in x])
-
-N_list = [3, 5, 11, 51]
 plt.figure(figsize=(12, 8))
-plt.plot(x, y_original, 'k-', label='原方波', linewidth=2)
+plt.subplot(2, 2, 1)
+plt.plot(x_square, y_square_true, 'k-', linewidth=2, label='原函数 (Original)')
 
-colors = ['r', 'g', 'b', 'm']
-for i, N in enumerate(N_list):
-    y_series = square_fourier_series(x, N)
-    plt.plot(x, y_series, colors[i], label=f'N={N}项傅里叶级数', alpha=0.7)
+# 绘制不同 N 的近似
+n_list_sq = [3, 5, 11, 51]
+colors = ['r', 'g', 'b', 'orange']
 
-plt.title('方波的傅里叶级数展开（吉布斯现象）', fontsize=14)
+for N, color in zip(n_list_sq, colors):
+    y_approx = calculate_square_fourier(x_square, N)
+    plt.plot(x_square, y_approx, color=color, linewidth=1, label=f'N={N}')
+
+plt.title('任务1: 方波的傅里叶级数逼近 (Gibbs现象观察)')
+plt.legend(loc='upper right', fontsize='small')
+plt.grid(True, alpha=0.3)
 plt.xlabel('x')
 plt.ylabel('f(x)')
-plt.legend()
-plt.grid(True)
-plt.axhline(0, color='gray', linestyle='--', alpha=0.5)
-plt.axvline(np.pi, color='gray', linestyle='--', alpha=0.5)
-plt.ylim(-1.5, 1.5)  # 放大观察吉布斯现象的过冲
-plt.show()
 
-# ===================== 任务2：三角波的傅里叶展开 =====================
-def triangle_wave(x):
-    """定义周期2π的三角波函数 g(x)=|x|, -π<x<π"""
-    x = x % (2 * np.pi)  # 周期化
-    if x > np.pi:
-        x = 2 * np.pi - x
-    return x
+# ==========================================
+# 任务 2: 三角波分析
+# ==========================================
+x_tri = np.linspace(-np.pi, np.pi, 1000)
+y_tri_true = np.abs(x_tri)
 
-def triangle_fourier_series(x, N):
-    """三角波傅里叶级数展开（推导得：a0=π, an=2*(-1)^n/n² (n≠0), bn=0）"""
-    series = np.pi / 2  # a0/2
-    for n in range(1, N+1):
-        an = 2 * ((-1)**n) / (n**2)
-        series += an * np.cos(n * x)
-    return series
+plt.subplot(2, 2, 2)
+plt.plot(x_tri, y_tri_true, 'k-', linewidth=2, label='原函数 |x|')
 
-# 2.1 绘制三角波收敛过程
-x = np.linspace(-2*np.pi, 2*np.pi, 2000)
-y_original_tri = np.array([triangle_wave(xi) for xi in x])
+n_list_tri = [1, 3, 5, 10]
+for N, color in zip(n_list_tri, colors):
+    y_approx = calculate_triangle_fourier(x_tri, N)
+    plt.plot(x_tri, y_approx, color=color, linewidth=1, linestyle='--', label=f'N={N}')
 
-N_list_tri = [1, 3, 5, 10]
-plt.figure(figsize=(12, 8))
-plt.plot(x, y_original_tri, 'k-', label='原三角波', linewidth=2)
-
-colors = ['r', 'g', 'b', 'm']
-for i, N in enumerate(N_list_tri):
-    y_series_tri = triangle_fourier_series(x, N)
-    plt.plot(x, y_series_tri, colors[i], label=f'N={N}项傅里叶级数', alpha=0.7)
-
-plt.title('三角波的傅里叶级数展开（收敛过程）', fontsize=14)
+plt.title('任务2: 三角波的傅里叶级数逼近 (收敛速度对比)')
+plt.legend(loc='lower center', fontsize='small')
+plt.grid(True, alpha=0.3)
 plt.xlabel('x')
-plt.ylabel('g(x)')
-plt.legend()
-plt.grid(True)
-plt.ylim(-0.5, np.pi + 0.5)
-plt.show()
 
-# 2.2 打印收敛分析（文字说明）
-print("\n=== 三角波比方波收敛更快的原因 ===")
-print("1. 方波存在跳变不连续，傅里叶系数衰减速率为 1/n（仅奇数项非零）；")
-print("2. 三角波连续且一阶导数连续（仅二阶导数跳变），傅里叶系数衰减速率为 1/n²；")
-print("3. 系数衰减越快，级数收敛越快，因此三角波比方波收敛更快。")
+# ==========================================
+# 任务 3: 信号合成与 FFT
+# ==========================================
+# 设定采样参数
+T = 2.0  # 总时长 2秒
+fs = 1000 # 采样率 1000Hz (足够高以避免混叠)
+N_samples = int(T * fs)
+t = np.linspace(0, T, N_samples, endpoint=False)
 
-# ===================== 任务3：简单信号合成与FFT =====================
-def composite_signal(t):
-    """生成复合信号 s(t) = sin(2π·3t) + 0.5sin(2π·7t) + 0.3sin(2π·11t)"""
-    return np.sin(2 * np.pi * 3 * t) + 0.5 * np.sin(2 * np.pi * 7 * t) + 0.3 * np.sin(2 * np.pi * 11 * t)
+# 合成信号
+# s(t) = sin(2pi*3t) + 0.5sin(2pi*7t) + 0.3sin(2pi*11t)
+s_t = np.sin(2 * np.pi * 3 * t) + \
+      0.5 * np.sin(2 * np.pi * 7 * t) + \
+      0.3 * np.sin(2 * np.pi * 11 * t)
 
-# 3.1 绘制时域波形
-t = np.linspace(0, 2, 2048, endpoint=False)  # 2048点保证频率分辨率
-y = composite_signal(t)
+# 3.1 时域波形
+plt.subplot(2, 2, 3)
+plt.plot(t, s_t)
+plt.title('任务3: 合成信号时域波形 s(t)')
+plt.xlabel('Time (s)')
+plt.ylabel('Amplitude')
+plt.xlim(0, 2)
+plt.grid(True, alpha=0.3)
 
-plt.figure(figsize=(12, 8))
-plt.subplot(2,1,1)
-plt.plot(t, y)
-plt.title('复合信号时域波形', fontsize=14)
-plt.xlabel('t (s)')
-plt.ylabel('s(t)')
-plt.grid(True)
+# 3.2 频域分析 (FFT)
+yf = fft(s_t)
+xf = fftfreq(N_samples, 1 / fs)
 
-# 3.2 FFT频谱分析
-fs = len(t) / 2  # 采样频率：总点数 / 总时长（t∈[0,2]）
-y_fft = np.fft.fft(y)
-freq = np.fft.fftfreq(len(t), 1/fs)  # 频率轴
-amplitude = np.abs(y_fft) / len(t) * 2  # 幅度归一化（直流分量除外）
-amplitude[0] /= 2  # 直流分量单独处理
+# 只取正频率部分
+positive_idx = xf >= 0
+xf_positive = xf[positive_idx]
+# 幅度归一化：除以N/2
+yf_magnitude = 2.0 / N_samples * np.abs(yf[positive_idx])
 
-# 只显示正频率部分
-mask = freq >= 0
-freq_pos = freq[mask]
-amp_pos = amplitude[mask]
+plt.subplot(2, 2, 4)
+plt.plot(xf_positive, yf_magnitude, 'r-')
+plt.title('任务3: 信号频谱图 (FFT)')
+plt.xlabel('Frequency (Hz)')
+plt.ylabel('Magnitude')
+plt.xlim(0, 15) # 限制显示范围以便看清 3, 7, 11 Hz
+plt.xticks(np.arange(0, 16, 1)) # 设置x轴刻度
+plt.grid(True, alpha=0.3)
 
-plt.subplot(2,1,2)
-# 修正：移除use_line_collection参数，适配新版matplotlib
-plt.stem(freq_pos, amp_pos, basefmt='k-')
-plt.title('复合信号FFT频谱', fontsize=14)
-plt.xlabel('频率 (Hz)')
-plt.ylabel('幅度')
-plt.xlim(0, 15)  # 聚焦有效频率范围
-plt.grid(True)
+# 标注峰值
+for freq in [3, 7, 11]:
+    idx = np.argmin(np.abs(xf_positive - freq))
+    amp = yf_magnitude[idx]
+    plt.text(freq, amp, f'{freq}Hz\n{amp:.2f}', ha='center', va='bottom')
+
 plt.tight_layout()
 plt.show()
+
+# 打印验证结果
+print("=== 任务3 频谱验证 ===")
+print("预期频率: 3Hz (幅度1.0), 7Hz (幅度0.5), 11Hz (幅度0.3)")
+print("FFT分析结果:")
+for freq in [3, 7, 11]:
+    idx = np.argmin(np.abs(xf_positive - freq))
+    print(f"频率: {xf_positive[idx]:.2f} Hz, 测量幅度: {yf_magnitude[idx]:.4f}")
