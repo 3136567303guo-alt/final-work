@@ -238,7 +238,7 @@ for freq in [3, 7, 11]:
 
 plt.tight_layout()
 plt.show()
-###
+```
 
 ## 六、 运行结果展示 (Result Visualization)
 ![alt text](./Figure_1.png)
